@@ -13,7 +13,7 @@ POSTGRES_DB = os.getenv("POSTGRES_DB")
 
 DATABASE_URL = f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 
-async_engine = create_async_engine(DATABASE_URL, pool_recycle=3600, echo=True)
+async_engine = create_async_engine(DATABASE_URL, pool_size=5, max_overflow=10, pool_timeout=30, pool_recycle=3600, echo=True)
 
 async_session_factory = sessionmaker(
     bind=async_engine,
