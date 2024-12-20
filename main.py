@@ -2,14 +2,12 @@ from fastapi import FastAPI, Depends, HTTPException, status
 
 from typing import Annotated
 
-from src.config.database import async_session_factory
-from src.schemas.register import RegisterDto
-from src.schemas.user import UserResponse
-from src.service.user import UserService
-
-
-
+from src.config.db import async_session_factory
+from src.user.depandencies import get_user_service
+from src.user.schema.register import RegisterDto, RegisterResponse
+from src.user.service.user import UserService
 app = FastAPI()
+
 
 AsyncSession  = async_session_factory()
 
@@ -30,20 +28,10 @@ async def test_db_connection(db: Annotated[AsyncSession, Depends(get_db)]):
             detail="Database connection failed",
         )
 
-
-@app.post("/register",
-    status_code=status.HTTP_201_CREATED,
-    response_model=UserResponse,
-    responses={
-        201: {"description": "User created"},
-    },
-)
+@app.post("/register", response_model=RegisterResponse)
 async def register(
-        data: RegisterDto,
-        user_service: Annotated[UserService, Depends(UserService)],
-        session: AsyncSession = Depends(get_db),
+    data: RegisterDto,
+    session: AsyncSession = Depends(get_db),  # DB 세션 주입
+    user_service: UserService = Depends(get_user_service),  # UserService 주입
 ):
-    try:
-        return user_service.register_user(session, data)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    return await user_service.register_user(data, session)
