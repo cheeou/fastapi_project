@@ -29,14 +29,13 @@ async def login(
         db: AsyncSession = Depends(get_async_session),
 ):
     try:
-        user =  await user_service.login_user(data, db)
+        return await user_service.login_user(data, db)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    token_data = {"email": user.email}
-    access_token = user_service.issue_token(token_data)
-    return {"token": access_token, "user": user.email}
+
+
 
 

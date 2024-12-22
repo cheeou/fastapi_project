@@ -1,3 +1,4 @@
+from os import access
 from typing import cast
 
 from fastapi import HTTPException, status
@@ -30,7 +31,7 @@ class UserService:
         self.repository = repository
         self.password_hasher = PasswordHasher()
 
-    def issue_token(self, data: dict):
+    def _issue_token(self, data: dict):
         to_encode = data.copy()
         expire_data = datetime.utcnow() + timedelta(ACCESS_TOKEN_EXPIRE_MINUTES)
         to_encode.update({"exp": expire_data})
@@ -51,7 +52,10 @@ class UserService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"Please check your account again",
             )
-        return user
+        token_data = {"email": user.email}
+        access_token = self._issue_token(token_data)
+
+        return {"token": access_token, "user": user.email}
 
     async def register_user(self, data: RegisterDto, session: AsyncSession) -> RegisterResponse:
 
@@ -65,11 +69,8 @@ class UserService:
                 message="User successfully registered"
         )
 
-    async def login_user(self, data: LoginDto, session: AsyncSession) -> LoginResponse:
+    async def login_user(self, data: LoginDto, session: AsyncSession) -> dict:
 
         user = await self._is_login_valid(data=data, session=session)
 
-        return LoginResponse(
-            email=user.email,
-            message="User successfully logged in"
-        )
+        return user
