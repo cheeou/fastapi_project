@@ -1,18 +1,14 @@
 from src.app.config.db import get_async_session, create_db_and_tables, get_user_db
-from src.app.dependencies import user_service
-from src.app.schemas.register import RegisterDto, RegisterResponse
 from src.app.routers import user
 
 from typing import Annotated
 
-from fastapi import FastAPI, Depends, status, HTTPException
+from fastapi import FastAPI, Depends
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 from sqlalchemy.ext.asyncio import AsyncSession
 app = FastAPI()
-
 app.include_router(user.router)
-
 
 # 애플리케이션 시작 시 테이블 생성
 @app.on_event("startup")
