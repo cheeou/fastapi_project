@@ -22,7 +22,6 @@ async def register(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-
 @router.post("/login", status_code=status.HTTP_200_OK)
 async def login(
         data: LoginDto,
@@ -36,6 +35,12 @@ async def login(
             detail=str(e)
         )
 
-
-
-
+@router.post("/refresh")
+async def refresh_access_token(refresh_token: str, db: AsyncSession = Depends(get_async_session)):
+    try:
+        return await user_service.refresh_access_token(refresh_token, db)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not refresh token",
+        )

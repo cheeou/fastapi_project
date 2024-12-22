@@ -1,6 +1,4 @@
-from typing import Self
-
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr
 
 class LoginDto(BaseModel):
     email: EmailStr
