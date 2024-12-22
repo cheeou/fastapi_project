@@ -1,11 +1,11 @@
+
 from sqlalchemy import Integer, String
 from sqlalchemy.orm import mapped_column, Mapped
-
 from src.app.config.db import Base
-
 
 class User(Base):
     __tablename__ = 'users'
+    __table_args__ = {'extend_existing': True}
 
     id : Mapped[int] = mapped_column(Integer, primary_key=True)
     email : Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
