@@ -3,9 +3,12 @@ from typing import cast
 
 from fastapi import HTTPException, status
 
+from src.app.models.user import User
+from src.app.repository.b_token import TokenBlacklistRepository
 from src.app.repository.user import UserRepository
-from src.app.schemas.login import LoginDto, LoginResponse
+from src.app.schemas.login import LoginDto
 from src.app.schemas.register import RegisterDto, RegisterResponse
+from src.app.config.config import settings
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,29 +20,16 @@ from jose import jwt
 
 from dotenv import load_dotenv
 
-import os
-
-load_dotenv()
-
-SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = os.getenv("ALGORITHM")
-ACCESS_TOKEN_EXPIRE_MINUTES = float(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
-REFRESH_TOKEN_EXPIRE_DAYS = os.getenv("REFRESH_TOKEN_EXPIRE_DAYS")
-
 class UserService:
-    def __init__(self, repository: UserRepository):
+    def __init__(self, repository: UserRepository, blacklist_repository: TokenBlacklistRepository):
         self.repository = repository
+        self.blacklist_repository = blacklist_repository
         self.password_hasher = PasswordHasher()
 
-    def _issue_token(self, data: dict):
-        to_encode = data.copy()
-        expire_data = datetime.utcnow() + timedelta(ACCESS_TOKEN_EXPIRE_MINUTES)
-        to_encode.update({"exp": expire_data})
-        encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    async def _is_token_valid(self, token: str, session: AsyncSession) -> bool:
+        return not await self.blacklist_repository.is_blacklisted(token, session)
 
-        return encoded_jwt
-
-    async def _is_login_valid(self, data: LoginDto, session: AsyncSession):
+    async def _is_login_valid(self, data: LoginDto, session: AsyncSession) -> User:
         user = await self.repository.get_user_by_email(session, cast(str, data.email))
 
         if not user:
@@ -52,10 +42,7 @@ class UserService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"Please check your account again",
             )
-        token_data = {"email": user.email}
-        access_token = self._issue_token(token_data)
-
-        return {"token": access_token, "user": user.email}
+        return user
 
     async def register_user(self, data: RegisterDto, session: AsyncSession) -> RegisterResponse:
 
@@ -69,8 +56,66 @@ class UserService:
                 message="User successfully registered"
         )
 
-    async def login_user(self, data: LoginDto, session: AsyncSession) -> dict:
-
+    async def login_user(self, data: LoginDto, session: AsyncSession) -> User:
         user = await self._is_login_valid(data=data, session=session)
+        print(user.email)
 
         return user
+
+    def create_access_token(self, data: dict) -> str:
+        to_encode = data.copy()
+        expires_delta = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        to_encode.update({"exp": expires_delta})
+        encoded_jwt = jwt.encode(
+            to_encode,
+            settings.SECRET_KEY,
+            algorithm=settings.ALGORITHM
+        )
+        return encoded_jwt
+
+    def create_refresh_token(self, data: dict) -> str:
+        to_encode = data.copy()
+        expires_delta = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        to_encode.update({"exp": expires_delta})
+        encoded_jwt = jwt.encode(
+            to_encode,
+            settings.SECRET_KEY,
+            algorithm=settings.ALGORITHM
+        )
+        return encoded_jwt
+
+    async def refresh_token(self, refresh_token: str, session: AsyncSession) -> str:
+        try:
+            payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            email = payload.get("sub")
+            if not email:
+                raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+            user = await self.repository.get_user_by_email(session, email)
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+            return user
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=401, detail="Refresh token expired")
+        except jwt.JWTError:
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    async def get_current_user(self, token: str) -> dict:
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            user_email = payload.get("sub")
+            if user_email is None:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token",
+                )
+            return {"email": user_email}
+        except jwt.JWTError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token",
+            )
+
+    async def logout_user(self, token: str, session: AsyncSession):
+        await self.blacklist_repository.add_token_to_blacklist(token, session)
+

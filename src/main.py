@@ -31,14 +31,13 @@ async def test_db_connection(db: AsyncSession = Depends(get_async_session)):
 async def test_user_db(user_db=Depends(get_user_db)):
     return {"user_db_type": str(type(user_db))}
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-@app.post("/token")
-async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
-    return {"access_token": form_data.username, "token_type": "bearer"}
-
-
-@app.get("/token/detail")
-async def my_token(token: Annotated[str, Depends(oauth2_scheme)]):
-    return {"token": token}
-
+# @app.post("/token")
+# async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+#     return {"access_token": form_data.username, "token_type": "bearer"}
+#
+#
+# @app.get("/token/detail")
+# async def my_token(token: Annotated[str, Depends(oauth2_scheme)]):
+#     return {"token": token}
+#

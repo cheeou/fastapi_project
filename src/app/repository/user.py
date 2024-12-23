@@ -13,9 +13,10 @@ class UserRepository:
 
     async def get_user_by_email(self, session: AsyncSession, email: str) -> Optional[User]:
         result = await session.execute(select(User).where(User.email == email))
-
-        return result.scalars().first() # mappings() : return 'dict' , scalars().first() : return SQLAlchemy ORM instance
-
+        user = result.scalars().first() # mappings() : return 'dict' , scalars().first() : return SQLAlchemy ORM instance
+        if user:
+            print(f"Loaded user email: {user.email}")  # 속성 접근 확인
+        return user
     async def create(self, session: AsyncSession, data: dict) -> User:
 
         existing_user = await self.get_user_by_email(session, data['email'])
