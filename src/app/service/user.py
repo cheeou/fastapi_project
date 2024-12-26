@@ -8,7 +8,7 @@ from src.app.repository.b_token import TokenBlacklistRepository
 from src.app.repository.user import UserRepository
 from src.app.schemas.login import LoginDto
 from src.app.schemas.register import RegisterDto, RegisterResponse
-from src.app.config.config import settings
+from src.app.config.settings import jwt_settings
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,6 @@ from argon2.exceptions import VerifyMismatchError
 from datetime import datetime, timedelta
 from jose import jwt
 
-from dotenv import load_dotenv
 
 class UserService:
     def __init__(self, repository: UserRepository, blacklist_repository: TokenBlacklistRepository):
@@ -64,29 +63,29 @@ class UserService:
 
     def create_access_token(self, data: dict) -> str:
         to_encode = data.copy()
-        expires_delta = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expires_delta = datetime.utcnow() + timedelta(minutes=jwt_settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         to_encode.update({"exp": expires_delta})
         encoded_jwt = jwt.encode(
             to_encode,
-            settings.SECRET_KEY,
-            algorithm=settings.ALGORITHM
+            jwt_settings.SECRET_KEY,
+            algorithm=jwt_settings.ALGORITHM
         )
         return encoded_jwt
 
     def create_refresh_token(self, data: dict) -> str:
         to_encode = data.copy()
-        expires_delta = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        expires_delta = datetime.utcnow() + timedelta(days=jwt_settings.REFRESH_TOKEN_EXPIRE_DAYS)
         to_encode.update({"exp": expires_delta})
         encoded_jwt = jwt.encode(
             to_encode,
-            settings.SECRET_KEY,
-            algorithm=settings.ALGORITHM
+            jwt_settings.SECRET_KEY,
+            algorithm=jwt_settings.ALGORITHM
         )
         return encoded_jwt
 
     async def refresh_token(self, refresh_token: str, session: AsyncSession) -> str:
         try:
-            payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            payload = jwt.decode(refresh_token, jwt_settings.SECRET_KEY, algorithms=[jwt_settings.ALGORITHM])
             email = payload.get("sub")
             if not email:
                 raise HTTPException(status_code=401, detail="Invalid refresh token")
@@ -102,7 +101,7 @@ class UserService:
 
     async def get_current_user(self, token: str) -> dict:
         try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            payload = jwt.decode(token, jwt_settings.SECRET_KEY, algorithms=[jwt_settings.ALGORITHM])
             user_email = payload.get("sub")
             if user_email is None:
                 raise HTTPException(
